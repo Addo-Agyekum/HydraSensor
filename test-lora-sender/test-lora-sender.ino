@@ -1,5 +1,7 @@
 #include <SPI.h>
 #include <LoRa.h>
+#include <OneWire.h>
+#include <DallasTemperature.h>
 
 // Pin Definitions
 #define SS_PIN 10             // Slave Select pin for LoRa
@@ -12,11 +14,28 @@
 // Function Prototypes
 void sendSensorData(float temperature, float turbidity);
 
-void setup() {
-  // Initialize Serial
-  Serial.begin(115200);
+// Turbidity Sensor Pins and Constants
+int turbidityPin = A0;
+float volt;
+float ntu;
+float a = -1120.4;
+float b = 5742.3;
+float c = -4353.8;
 
-  // Initialize LoRa communication
+// Temperature Sensor Pins and Libraries
+#define ONE_WIRE_BUS 2
+OneWire oneWire(ONE_WIRE_BUS);
+DallasTemperature sensors(&oneWire);
+
+
+void setup() {
+  // Start serial communication for debugging and data transmission
+  Serial.begin(9600);
+
+  // Start temperature sensor
+  sensors.begin();
+
+   // Initialize LoRa communication
   LoRa.setPins(SS_PIN, RST_PIN, DIO0_PIN);
 
   if (!LoRa.begin(LORA_FREQUENCY)) {
@@ -32,15 +51,45 @@ void setup() {
 }
 
 void loop() {
-  // Placeholder sensor data, replace with actual sensor readings
-  float temperature = 25.5;  // Replace with temperature sensor reading
-  float turbidity = 3.8;     // Replace with turbidity sensor reading
+  // ---------- Turbidity Sensor Reading ----------
+  volt = 0;
+  // Take 800 analog readings and average them
+  for (int i = 0; i < 800; i++) {
+    volt += ((float)analogRead(turbidityPin) / 1023) * 5;
+  }
+  volt = volt / 800;
+  volt = round_to_dp(volt, 2);  // Round the voltage value to 2 decimal places
+
+  // Apply the polynomial equation to calculate NTU
+  ntu = a * sq(volt) + b * volt + c;
+  if (ntu < 0) ntu = 0;  // Ensure NTU doesn't go negative
+
+  // ---------- Temperature Sensor Reading ----------
+  sensors.requestTemperatures();  // Get temperatures from all devices
+  float tempC = sensors.getTempCByIndex(0);  // Celsius
+
+  // Print data to Serial for debugging
+  Serial.print("Turbidity Voltage: ");
+  Serial.print(volt);
+  Serial.print(" V, NTU: ");
+  Serial.println(ntu);
+  
+  Serial.print("Celsius: ");
+  Serial.print(tempC);
+  Serial.print(" C");  // Properly print degrees Celsius
+  Serial.println();
 
   // Send the sensor data via LoRa
-  sendSensorData(temperature, turbidity);
+  sendSensorData(tempC, ntu);
 
-  // Wait before sending next data (adjust as necessary)
-  delay(5000);
+  delay(2000);  // Wait for 2 seconds before the next reading
+}
+
+// Function to round the voltage to a specific number of decimal places
+float round_to_dp(float in_value, int decimal_place) {
+  float multiplier = pow(10.0f, decimal_place);
+  in_value = round(in_value * multiplier) / multiplier;
+  return in_value;
 }
 
 // Function to send sensor data via LoRa
