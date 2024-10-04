@@ -4,7 +4,7 @@
 
 const char* ssid = "Scarlet";            // Replace with your Wi-Fi SSID
 const char* password = "azizaziz";       // Replace with your Wi-Fi Password
-const char* serverUrl = "https://shopify-webhook-sigma.vercel.app/test";  // Your HTTPS server URL
+const char* serverUrl = "https://shopify-webhook-sigma.vercel.app/test";  // our HTTPS server URL
 
 WiFiClientSecure client;
 
